@@ -1,6 +1,25 @@
+from io.keplerelement import KeplerElements
+import numpy as np
+
+DEG = np.pi/180
+
 class TLEConverter:
     MU_E = 3.986004418e14 # m^3/s^2 standard gravitational parameter for Earth
 
     def parse(lines):
         l2 = lines[1]
-        inc+deg =
+        inclination_deg = float(l2[8:16])
+        raan_deg = float(l2[17:25]) # Right Ascension of Ascending Node
+        eccentricity = l2[26:33] 
+        argp_deg = l2[34:42] # Argument of Perigee (lower omega)
+        M_deg = float(l2[43:51])
+        mmotion_rev = float(l2[52:63])
+
+        i = inclination_deg * DEG
+        omega = raan_deg*DEG
+        e = float(f"0.{eccentricity}")
+        loweromega = argp_deg 
+        m = M_deg*DEG
+        n = mmotion_rev * 2*np.pi / (24*3600)  # rad/s
+        a = (TLEConverter.MU_E / (n**2))**(1/3)
+        return KeplerElements(i=i, omega=omega, e=e, loweromega=loweromega, m=m, n=n, a=a)
