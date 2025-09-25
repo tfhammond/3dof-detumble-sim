@@ -1,4 +1,4 @@
-from io.keplerelement import KeplerElements
+from tle_io.keplerelement import KeplerElements
 import numpy as np
 
 DEG = np.pi/180
@@ -22,4 +22,4 @@ class TLEConverter:
         m = M_deg*DEG
         n = mmotion_rev * 2*np.pi / (24*3600)  # rad/s
         a = (TLEConverter.MU_E / (n**2))**(1/3)
-        return KeplerElements(i=i, omega=omega, e=e, loweromega=loweromega, m=m, n=n, a=a)
+        return KeplerElements(i=i, omega=omega, e=e, loweromega=loweromega, M=m, n=n, a=a)

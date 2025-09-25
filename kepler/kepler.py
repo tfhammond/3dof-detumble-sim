@@ -32,7 +32,7 @@ def kepler_solve_E(M, e):
 
 class KeplerToRV:
 
-"""     MU_E = 3.986004418e14
+    MU_E = 3.986004418e14
 
     def rv_eci(self, el):
         i = el.i
@@ -43,9 +43,9 @@ class KeplerToRV:
         n = el.n
         a = el.a
     
-        E = kepler_solve_E(M, e)
+        E = kepler_solve_E(M, e) 
         cosE = np.cos(E)
-        sinE = np.sin(E) """
+        sinE = np.sin(E)
 
         
 
