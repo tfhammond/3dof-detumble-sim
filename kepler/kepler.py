@@ -27,18 +27,14 @@ def kepler_solve_E(M, e):
             break
     return E
 
-
-
-
-
 class KeplerToRV:
 
-
+    # TODO Write tests for rv_eci
     def rv_eci(self, el):
         i = el.i
         raan = el.raan
         e = el.e
-        w = el.w
+        w = float(el.w)
         M = el.M
         #n = el.n           # this n or n calculated below???
         a = el.a

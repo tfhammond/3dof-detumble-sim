@@ -3,6 +3,8 @@ import numpy as np
 
 DEG = np.pi/180
 
+
+# TODO Write tests for parse
 class TLEConverter:
 
     def parse(lines):

@@ -1,8 +1,15 @@
+import numpy as np
+
 from tle_io.keplerelement import KeplerElements
 from tle_io.tleconverter import TLEConverter
 from tle_io.tleload import TLELoader
+
+from attitude_dynamics.dynamics import Dynamics
 #import kepler.kepler
-from pathlib import Path
+
+from simulator.sim import run as simrun
+
+
 
 import requests
 
@@ -10,13 +17,8 @@ iss_txt_url = "https://live.ariss.org/iss.txt"
 
 def mainTest():
 
-    iss = requests.get(iss_txt_url)
-    load = TLELoader.read_lines(iss.text)
-
-    print(load)
     
-    kep =TLEConverter.parse(load)
-    print(kep)
+    simrun()
 
 
 
