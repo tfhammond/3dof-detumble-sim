@@ -2,9 +2,8 @@ import numpy as np
 
 from dataclasses import dataclass
 
-from kepler.twobodyprop import TwoBodyPropagator, rk4_step
-from math_equations.math import w_matrix
-from math_equations.math import normalize_quat
+from kepler.twobodyprop import rk4_step
+from math_equations.math_eqs import w_matrix, normalize_quat
 
 @dataclass
 class Dynamics:

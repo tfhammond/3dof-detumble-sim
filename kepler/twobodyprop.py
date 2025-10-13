@@ -18,7 +18,8 @@ class TwoBodyPropagator:
         r =state[:3]
         v = state[3:]
         r_norm = np.linalg.norm(r)
-        a = -self.KeplerElements.MU_E * r / r_norm**3
+        a = -KeplerElements.MU_E * r / r_norm**3
+        #a = -self.KeplerElements.MU_E * r / r_norm**3
         return np.hstack((v, a))
     
     def step(self, state, dt):

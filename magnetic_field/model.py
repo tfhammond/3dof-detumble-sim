@@ -6,7 +6,7 @@ from typing import Iterable
 import numpy as np
 import ppigrf
 
-from math_equations.math import quat_conjugate, quat_multiply, normalize_quat
+from math_equations.math_eqs import quat_conjugate, quat_multiply, normalize_quat
 
 def utc_to_julian_date(dt_utc):
     """
@@ -69,17 +69,18 @@ def ecef_to_eci(state, theta):
 def ecef_to_spherical(ecef): #returns r km,theta deg,phi deg
 
     x,y,z = ecef
-    r = float(np.linalg.norm(ecef)) / 1000 #km
+    x_km, y_km, z_km = x/1000, y/1000, z/1000 #km
+    r_km = float(np.linalg.norm(ecef)) / 1000 #km
     
     #0 at north pole and 90 at equator? (second quatrant)
     
-    theta_rad = np.arccos(np.clip(z / r, -1.0, 1.0))  #colatitude 
-    phi_rad = np.arctan2(y,x) # degrees east (same as lon)
+    theta_rad = np.arccos(np.clip(z_km / r_km, -1.0, 1.0))  #colatitude 
+    phi_rad = np.arctan2(y_km,x_km) # degrees east (same as lon)
 
     theta = np.degrees(theta_rad)
     phi = np.degrees(phi_rad)
 
-    return r, theta, phi
+    return r_km, theta, phi
 
 def spherical_to_ecef(b_r, b_theta, b_phi, theta, phi): #theta and phi in deg
 
@@ -135,14 +136,19 @@ class MagneticFieldModel:
         theta = gmst_angle_rad(date)
 
 
-        r_ecef = self.eci_to_ecef(r_eci, date)
-
+        r_ecef = eci_to_ecef(r_eci, theta)
 
         r, theta_deg, phi_deg = ecef_to_spherical(r_ecef)
         if r <= 0.0:
             return np.zeros(3)
         
-        b_r, b_theta, b_phi = ppigrf.igrf_gc(r,theta_deg,phi_deg, date)
+        date_naive = date.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        b_r, b_theta, b_phi = ppigrf.igrf_gc(r,theta_deg,phi_deg, date_naive)
+
+        b_r *= 1e-9
+        b_theta *= 1e-9
+        b_phi *= 1e-9
 
         b_ecef_T = spherical_to_ecef(b_r, b_theta, b_phi, theta_deg, phi_deg)
 

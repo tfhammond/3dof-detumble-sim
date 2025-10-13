@@ -12,4 +12,4 @@ class TLELoader:
         if len(lines) < 2:
             raise ValueError("TLE must be two lines")
         
-        return lines[1:]
+        return lines[:2]
