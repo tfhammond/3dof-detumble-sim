@@ -20,7 +20,9 @@ iss_txt_url = "https://live.ariss.org/iss.txt"
 
 def load_kepler_from_tle():
 
-    tle = "1 25544U 98067A   25281.52879516  .00013673  00000-0  24910-3 0  9990\n2 25544  51.6312 105.3299 0000824 223.8777 136.2147 15.49772654532744"
+    #tle = "1 25544U 98067A   25281.52879516  .00013673  00000-0  24910-3 0  9990\n2 25544  51.6312 105.3299 0000824 223.8777 136.2147 15.49772654532744"
+
+    tle = "1 25544U 98067A   19178.82735530  .00002515  00000-0  49918-4 0  9997\n2 25544  51.6428 308.4904 0008116  89.4883  70.1063 15.51247238176900"
 
     # TLE 
     #iss = requests.get(iss_txt_url)
@@ -41,6 +43,9 @@ def make_orbit_stepper():
 def build_sim():
     #orbit intial state
     kep = load_kepler_from_tle()
+
+    print(kep)
+
     r0, v0 = KeplerToRV().rv_eci(kep)
     x_orbit0 = np.hstack((r0, v0))
 
@@ -52,7 +57,9 @@ def build_sim():
     # w0_deg_s = np.array([8.0, -6.0, 10.0]) # initial body rates in deg/s (example)
     # w_B0 = np.deg2rad(w0_deg_s)            # rad/s
 
-    w_B0 = np.deg2rad(np.array([180.0, 180.0, 180.0]))  # rad/s (fast tumbling start)
+    #w_B0 = np.deg2rad(np.array([180.0, 180.0, 180.0]))  # rad/s (fast tumbling start) from paper
+
+    w_B0 = np.deg2rad(np.array([45.0, 45.0, 45.0]))
 
     dyn = Dynamics(I=I, q_IB=q_IB0, w_B=w_B0)
 
@@ -62,15 +69,18 @@ def build_sim():
     #controller
 
     #T_s = 0.1 
-    T_s = 0.25 # s
-    h = 0.025 #still deciding if I need this
+    T_s = 0.1 # s
+    h = 0.05 #still deciding if I need this
     duty = 0.6
     m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
+    #m_bar = np.array([0.15, 0.15, 0.15])
     polarity = np.array([-1, 1, -1], dtype=int)
     I_min = float(np.min(np.diag(I)))
     omega_orbit = float(kep.n) #probably should use this but lets let it cook
     #omega_orbit = 0.0011407380731989082
-    xi_geomag = np.deg2rad(60.0)
+    #xi_geomag = np.deg2rad(60.0)
+    xi_geomag = kep.i
+    print(xi_geomag)
 
 
     p_bar = 8.125e-3
@@ -251,10 +261,11 @@ def run():#
 
     #sim_duration = 2 * 60
     #sim_duration =  2 * 1.53 * 60 * 60.0
-    sim_duration = 1 * 60 * 60 #seconds (20 minutes)
-    #sim_duration = 16 * 1.53 * 3600.0 # 16 orbits? i think
+    #sim_duration = 2.5 * 60 * 60 #seconds 
+    sim_duration = 30
+    #sim_duration = 12.5 * 1.53 * 3600.0 # n orbits? i think
     t_final = t0 + timedelta(seconds=sim_duration)
-
+ 
     result = sim.run(t0=t0,t_final=t_final,x_orbit0=x_orbit0)
 
     res = result if isinstance(result, dict) else getattr(sim, "log", {})

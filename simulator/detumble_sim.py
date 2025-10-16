@@ -7,6 +7,7 @@ from magnetic_field.model import MagneticFieldModel
 from simulator.config import DetumbleConfig
 
 from datetime import timezone, timedelta
+from zoneinfo import ZoneInfo
 
 def _as_utc(dt):
     """Ensure timezone-aware UTC (IGRF expects real UTC epochs)."""
@@ -24,7 +25,7 @@ class DetumbleSim:
         self.orbit_step = orbit_step #orbital propagator: x -> x_next for state x = [r(3); v(3)].
         self.att = attitude
         self.field = field
-        self.mags = mags # What?
+        self.mags = mags # dont need?
         self.ctrl = ctrl
         self.cfg = cfg # DetumbleConfig
 
@@ -40,9 +41,7 @@ class DetumbleSim:
             "k_bdot": [],
             "m_cmd": [],
             "t_on": [],
-            "dir": [],
-            "V": [], #probably dont need this (CHANGE LATER)
-
+            "dir": []
         }
     
 
@@ -50,6 +49,7 @@ class DetumbleSim:
     def run(self, t0, t_final, x_orbit0):
 
         current_time = _as_utc(t0)
+        #print(current_time.timestamp())
         t_end = _as_utc(t_final)
         T_s = self.cfg.T_s
         h = self.cfg.h
@@ -57,10 +57,7 @@ class DetumbleSim:
         h = T_s / Nsub
         x_orbit = x_orbit0.copy() #do i need .copy()
 
-        E_dot_axis = np.zeros(3)   # sum of τ·ω when exactly one axis coil is ON
-        N_on_axis  = np.zeros(3)   # count of ON substeps per axis
-        print_timer = 0.0          # seconds since last print
-        PRINT_PERIOD = 5.0     # print every ~60 s of sim time (tweak as you like)
+        print(f"End time (Pacific) = {t_end.astimezone(ZoneInfo('America/Los_Angeles'))}")
 
         while current_time <= t_end and not self._detumbled:
 
@@ -77,7 +74,6 @@ class DetumbleSim:
             k_bdot = out["k_bdot"]
 
             b_norm = float(np.linalg.norm(b_tilde_B))
-            # V = ....
 
             if np.all(pv <= self.cfg.p_bar):
                 self._stop_counter += 1
@@ -95,7 +91,7 @@ class DetumbleSim:
 
             elapsed = 0.0
             for i in range(Nsub):
-                m_c = np.zeros(3)
+                m_c = np.zeros(3) #commanded mag dipole
                 for j in range(3):
                     if elapsed < float(t_on[j]):
                         m_c[j] = float(m_cmd[j])
@@ -106,40 +102,18 @@ class DetumbleSim:
 
                 tau_c_B = np.cross(m_c, b_body_sub_T)
 
-                for j in range(3):
-                    if m_c[j] != 0.0:
-                        m_j = np.zeros(3); m_j[j] = m_c[j]
-                        tau_j = np.cross(m_j, b_body_sub_T)
-                        P_j = float(np.dot(tau_j, self.att.w_B))
-                        E_dot_axis[j] += P_j
-                        N_on_axis[j]  += 1
-
-
                 self.att.step(h, tau_c_B)
                 x_orbit = self.orbit_step(x_orbit, h)
 
                 current_time = current_time + timedelta(seconds=h)
                 elapsed += h
-                print_timer += h
-
-            if print_timer >= PRINT_PERIOD:
-                avg_P_axis = np.divide(E_dot_axis, np.maximum(N_on_axis, 1))
-                print(f"[energy] t={current_time}: avg_P_axis = {avg_P_axis}")
-                # reset window so you get fresh averages next minute
-                E_dot_axis[:] = 0.0
-                N_on_axis[:]  = 0.0
-                print_timer   = 0.0
-            
-
-                
-
-
 
         if self._detumbled:
             t_det = current_time
         else:
             t_det = None
 
+        
 
         return {
             "t": np.asarray(self.log["t"], dtype="datetime64[ns]") if self.cfg.log_every_sample else np.array([], dtype="datetime64[ns]"),
@@ -151,7 +125,6 @@ class DetumbleSim:
             "m_cmd": self._maybe_array("m_cmd", (0, 3)),
             "t_on": self._maybe_array("t_on", (0, 3)),
             "dir": self._maybe_array("dir", (0, 3)),
-            "V": self._maybe_array("V", (0,)),
             "t_detumbled": np.datetime64(t_det) if t_det is not None else None,
             "detumbled": bool(self._detumbled),
         }
@@ -179,7 +152,6 @@ class DetumbleSim:
         self.log["m_cmd"].append(np.asarray(m_cmd, dtype=float).copy())
         self.log["t_on"].append(np.asarray(t_on, dtype=float).copy())
         self.log["dir"].append(np.asarray(dir_vec, dtype=int).copy())
-        #self.log["V"].append(float(V))
 
 
 
@@ -187,4 +159,4 @@ class DetumbleSim:
 
         r_eci_m = x_orbit[:3]
 
-        return self.field.b_body(r_eci_m, self.att.q_IB, current_time) #T
+        return self.field.b_body(r_eci_m, self.att.q_IB, current_time) #T``
