@@ -57,8 +57,8 @@ def gmst_angle_rad(date):
 def about_z(theta):
     """rotation about z axis by theta. used in eci to ecef and ecef to eci"""
 
-    return np.array([[ np.cos(theta), np.sin(theta), 0.0],
-                     [-np.sin(theta), np.cos(theta), 0.0],
+    return np.array([[ np.cos(theta), -np.sin(theta), 0.0],
+                     [np.sin(theta), np.cos(theta), 0.0],
                      [0.0           , 0.0          , 1.0]])
 
 
@@ -115,7 +115,7 @@ def rotate_eci(q_ib, v_eci):
 
     v_q = np.array([0.0, v_eci[0], v_eci[1], v_eci[2]])
 
-    v_b = quat_multiply(quat_multiply(q,v_q), quat_conjugate(q))
+    v_b = quat_multiply(quat_conjugate(q), quat_multiply(q,v_q))
 
     return v_b[1:]
 

@@ -84,15 +84,14 @@ class BDotController:
 
         # gain schedule 
         k_star = 2.0 * self.cfg.omega_orbit * (1.0 + np.sin(self.cfg.xi_geomag)) * self.cfg.I_min
-        #k_bdot = k_star / (self.cfg.phi * p + self.cfg.eps)
-        k_bdot = 0.1
+        k_bdot = k_star / (self.cfg.phi * p + self.cfg.eps)
+        #k_bdot = 0.1
 
         #  compute desired dipole (m_des) 
         if b_norm <= 0.0:
             m_des = np.zeros(3)
         else:
-            m_des = -(k_bdot / max(b_norm, 1e-12)) * b_hat_dot
-            #m_des = -(k_bdot / b_norm) * b_hat_dot
+            m_des = -(k_bdot / b_norm) * b_hat_dot
 
         
 

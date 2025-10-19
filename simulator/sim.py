@@ -72,8 +72,8 @@ def build_sim():
     T_s = 0.1 # s
     h = 0.05 #still deciding if I need this
     duty = 0.6
-    m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
-    #m_bar = np.array([0.15, 0.15, 0.15])
+    #m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
+    m_bar = np.array([0.024, 0.024, 0.024])
     polarity = np.array([-1, 1, -1], dtype=int)
     I_min = float(np.min(np.diag(I)))
     omega_orbit = float(kep.n) #probably should use this but lets let it cook
@@ -84,6 +84,7 @@ def build_sim():
 
 
     p_bar = 8.125e-3
+    #p_bar = 0.1
     phi = 4.0 / T_s
     eps = 1.0 - np.sqrt(3.0 * phi * p_bar)
 
@@ -153,10 +154,12 @@ def plot_results(res, t0):
 
     # Convert time to seconds for x-axis
     try:
-        t_sec = to_seconds(np.asarray(t_vals), t0)
-    except Exception:
-        # If t is already float seconds
         t_sec = np.asarray(t_vals, dtype=float)
+    except Exception:
+        try:
+            t_sec = to_seconds(np.asarray(t_vals), t0)
+        except Exception:
+            t_sec = np.asarray([], dtype=float)
 
     # Prepare arrays
     w_B = np.asarray(w_B, dtype=float)        # shape (N, 3)
@@ -261,9 +264,12 @@ def run():#
 
     #sim_duration = 2 * 60
     #sim_duration =  2 * 1.53 * 60 * 60.0
-    #sim_duration = 2.5 * 60 * 60 #seconds 
-    sim_duration = 30
-    #sim_duration = 12.5 * 1.53 * 3600.0 # n orbits? i think
+    sim_duration = 2 * 60 * 60 #seconds 
+    #sim_duration = 18554
+    #sim_duration = 18.5 * 1.53 * 3600.0 # n orbits? i think
+
+    
+
     t_final = t0 + timedelta(seconds=sim_duration)
  
     result = sim.run(t0=t0,t_final=t_final,x_orbit0=x_orbit0)
@@ -272,11 +278,16 @@ def run():#
 
     plot_results(res, t0)
 
-    print("n_samples:", len(res["t"]))
-    print("t[0]:", res["t"][0], "  t[-1]:", res["t"][-1])
-    print("unique_seconds_spanned:", (np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[-1] -
-                                    np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[0]) / 1e9)
+    # print("n_samples:", len(res["t"]))
+    # print("t[0]:", res["t"][0], "  t[-1]:", res["t"][-1])
+    # print("unique_seconds_spanned:", (np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[-1] -
+    #                                 np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[0]) / 1e9)
 
+    t_arr = np.asarray(res.get("t", []), dtype=float)
+    if t_arr.size:
+        print("n_samples:", len(t_arr))
+        print("t[0] [s]:", float(t_arr[0]), "  t[-1] [s]:", float(t_arr[-1]))
+        print("simulated_span_seconds:", float(t_arr[-1] - t_arr[0]))
 
 
     
