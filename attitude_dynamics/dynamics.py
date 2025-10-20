@@ -1,20 +1,33 @@
 import numpy as np
 
-from dataclasses import dataclass
-
 from kepler.twobodyprop import rk4_step
-from math_equations.math_eqs import w_matrix, normalize_quat
+from math_equations.math_eqs import normalize_quat, quat_rate_scalar_first
 
-@dataclass
 class Dynamics:
-    I: np.ndarray
-    q_IB : np.ndarray
-    w_B : np.ndarray
+    
+    def __init__(self, I, q_IB, w_B):
 
-    def control_torque(self, m_c_B, b_E_B):
+        I = np.array(I, dtype=float, copy=True)
+        self.I = I
+
+        diag = np.diag(self.I)
+        self._is_diag = np.allclose(self.I, np.diag(diag))
+
+        if self._is_diag:
+            self.I_diag = diag
+            self.invI = None
+        else:
+            self.I_diag = None
+            self.invI = np.linalg.inv(I) # inverse I
+
+
+        self.q_IB = normalize_quat(np.asarray(q_IB, dtype=float).copy())
+        self.w_B = np.asarray(w_B, dtype=float).copy()
+
+    @staticmethod
+    def control_torque(m_c_B, b_E_B):
         """Magnetic control torque in body coords (Eq 5)"""
-        tau_c_B = np.cross(m_c_B, b_E_B)
-        return tau_c_B
+        return np.cross(m_c_B, b_E_B)
     
     def euler_moment(self, state, tau_c_B):
         """
@@ -28,23 +41,41 @@ class Dynamics:
         w = state[:3]
         q = state[3:7]
 
-        w_cross_Iw = np.cross(w, self.I @ w)
-        wdot = np.linalg.solve(self.I, -w_cross_Iw + tau_c_B) #ax = b
+        if self._is_diag:
+            Iw = self.I_diag * w
+        else:
+            Iw = self.I @ w
 
-        q_dot = 0.5 * (w_matrix(w) @ q) # need to implement w_matrix 
+        w_cross_Iw = np.cross(w, Iw)
+        rhs = -w_cross_Iw + tau_c_B
 
-        return np.hstack((wdot, q_dot))
+        if self._is_diag:
+            wdot = rhs / self.I_diag
+        else:
+            wdot = self.invI @ rhs
+
+        q_dot = quat_rate_scalar_first(q, w)
+
+        xdot = np.empty(7, dtype=float)
+        xdot[:3] = wdot
+        xdot[3:] = q_dot
+        return xdot
     
     def step(self, dt, tau_c_B): #quaternion or no
         """ propagate the state by dt seconds using rk4 """
 
-        x = np.hstack((self.w_B, self.q_IB))
+        x0 = np.empty(7, dtype=float)
+        x0[:3] = self.w_B
+        x0[3:] = self.q_IB
+
+
+        #x = np.hstack((self.w_B, self.q_IB))
 
         # Rk4 
-        def f(local_x):
-            return self.euler_moment(local_x, tau_c_B)
+        def f(x):
+            return self.euler_moment(x, tau_c_B)
 
-        x_next = rk4_step(f, x, dt)
+        x1 = rk4_step(f, x0, dt)
     
-        self.w_B = x_next[:3]
-        self.q_IB = normalize_quat(x_next[3:7])
+        self.w_B = x1[:3]
+        self.q_IB = normalize_quat(x1[3:])
