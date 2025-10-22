@@ -68,9 +68,6 @@ class Dynamics:
         x0[:3] = self.w_B
         x0[3:] = self.q_IB
 
-
-        #x = np.hstack((self.w_B, self.q_IB))
-
         # Rk4 
         def f(x):
             return self.euler_moment(x, tau_c_B)

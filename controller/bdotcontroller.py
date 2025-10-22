@@ -1,7 +1,5 @@
 import numpy as np
-from dataclasses import dataclass, field
-
-#not sure about this
+from dataclasses import dataclass
 
 @dataclass
 class BDotConfig:
@@ -15,19 +13,11 @@ class BDotConfig:
 
 class BDotController:
 
-
     def __init__(self, cfg: BDotConfig):
 
         self.cfg = cfg
-
-        self.k_bdot_star = 2.0 * cfg.omega_orbit * (1.0 + np.sin((cfg.xi_geomag))) * cfg.I_min #0.000114 when xi = 75 deg
-        print(self.k_bdot_star)
-
-
+        self.k_bdot_star = 2.0 * cfg.omega_orbit * (1.0 + np.sin((cfg.xi_geomag))) * cfg.I_min
         self.prev_b_hat = None
-
-
-
 
     def command(self, b_E_B):
         """b_E_B [3,]
@@ -35,7 +25,6 @@ class BDotController:
         
             returns m_d, t_on, direction [3,]
         """
-    
 
         b_norm = np.linalg.norm(b_E_B)
 
@@ -51,26 +40,10 @@ class BDotController:
         else:
             b_hat_dot = (b_hat - self.prev_b_hat) / self.cfg.T_s
 
-            #b_hat_dot = b_hat_dot - np.dot(b_hat_dot, b_hat) * b_hat # ? orthogonalize
-
-            #b_hat_dot = (self.prev_b_hat - b_hat) / self.cfg.T_s
-
-        # print(f"b_hat: {b_hat}")
-        # print(f"prev_b_hat: {self.prev_b_hat}")
-        # print(f"b_hat_dot = {b_hat_dot}")
-
-
-
-
-
         self.prev_b_hat = b_hat
 
         m_d = -(self.k_bdot_star / b_norm) * b_hat_dot
 
-        
-
-        #print(m_d)
-        #m_d = (self.k_bdot_star / b_norm) * b_hat_dot
         t_on = np.empty(3)
         direction = np.zeros(3, dtype=int)
 
@@ -81,10 +54,8 @@ class BDotController:
                 continue
             scale = abs(m_d[i]) / self.cfg.m_bar[i]
             t_on[i] = self.cfg.duty * self.cfg.T_s * min(1.0, scale)
-            #print(t_on[i])
             if t_on[i] > 0.0:
                 direction[i] = int(self.cfg.polarity[i] * np.sign(m_d[i]))
-                #print(direction[i])
             else:
                 direction[i] = 0
             

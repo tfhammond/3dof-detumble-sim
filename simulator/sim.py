@@ -20,15 +20,9 @@ iss_txt_url = "https://live.ariss.org/iss.txt"
 
 def load_kepler_from_tle():
 
-    #tle = "1 25544U 98067A   25281.52879516  .00013673  00000-0  24910-3 0  9990\n2 25544  51.6312 105.3299 0000824 223.8777 136.2147 15.49772654532744"
-
+    # ex tle. Can use iss_txt_url if you want
     tle = "1 25544U 98067A   19178.82735530  .00002515  00000-0  49918-4 0  9997\n2 25544  51.6428 308.4904 0008116  89.4883  70.1063 15.51247238176900"
-
-    # TLE 
-    #iss = requests.get(iss_txt_url)
-    #load = TLELoader.read_lines(iss.text)
     load = TLELoader.read_lines(tle)
-    # keplerele object
     kep = TLEConverter.parse(load)
 
     return kep
@@ -49,18 +43,10 @@ def build_sim():
     r0, v0 = KeplerToRV().rv_eci(kep)
     x_orbit0 = np.hstack((r0, v0))
 
-    #attitude & inertia (ask for the values cuz idk them)
-    #I = np.diag([0.001731, 0.001726, 0.000264]) # kg*m^2
-    I = np.diag([1.731e-3, 1.726e-3, 0.264e-3])
-    #I = np.diag([0.001731, 0.001726, 0.000264])     # kg·m^2 (example)
+    I = np.diag([0.001731, 0.001726, 0.000264]) # kg*m^2
+    #I =  np.diag([0.001, 0.001, 0.001]) # kg·m^2 (example)
     q_IB0 = np.array([1.0, 0.0, 0.0, 0.0]) # scalar-first quaternion
-    # w0_deg_s = np.array([8.0, -6.0, 10.0]) # initial body rates in deg/s (example)
-    # w_B0 = np.deg2rad(w0_deg_s)            # rad/s
-
     w_B0 = np.deg2rad(np.array([180.0, 180.0, 180.0]))  # rad/s (fast tumbling start) from paper
-
-    #w_B0 = np.deg2rad(np.array([45.0, 45.0, 45.0]))
-
     dyn = Dynamics(I=I, q_IB=q_IB0, w_B=w_B0)
 
 
@@ -72,36 +58,16 @@ def build_sim():
     #field model
     field = MagneticFieldModel(gmst_tracker)
 
-    r_eci = x_orbit0[:3]
-    q_IB  = dyn.q_IB
-    t0_naive = datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-#     b_eci = field.b_eci(r_eci, t0_naive)
-# # Two ways to get body field
-#     b_body_a = field.b_body(r_eci, q_IB, t0_naive)      # your full pipeline
-#     b_body_b = rotate_eci(q_IB, b_eci)    
-
-#     print("Δb_body =", np.linalg.norm(b_body_a - b_body_b))
-#     print("b_body_a:", b_body_a)
-#     print("b_body_b:", b_body_b)
-
-
     #controller
 
-    #T_s = 0.1 
     T_s = 0.1 # s
-    h = 0.01 #still deciding if I need this
+    h = 0.01
     duty = 0.6
-    #m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
-    m_bar = np.array([0.024, 0.024, 0.024])
-    polarity = np.array([1, 1, 1], dtype=int)
-    #polarity = -polarity
+    m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
+    polarity = np.array([-1, -1, -1], dtype=int)
     I_min = float(np.min(np.diag(I)))
-    omega_orbit = float(kep.n) #probably should use this but lets let it cook
+    omega_orbit = float(kep.n)
     xi_geomag = kep.i
-    #xi_geomag = 75.0
-    print(xi_geomag)
 
     ctrl_cfg = BDotConfig(
         T_s=T_s,
@@ -150,6 +116,12 @@ def plot_results(res, t0):
     t_on = res.get("t_on", [])
     m_des = res.get("m_des", [])
 
+    r_eci = res.get("r_eci", [])
+    v_eci = res.get("v_eci", [])
+    r_norm = res.get("r_norm", [])
+    v_norm = res.get("v_norm", [])
+
+
     # Convert time to seconds for x-axis
     try:
         t_sec = np.asarray(t_vals, dtype=float)
@@ -165,6 +137,16 @@ def plot_results(res, t0):
     m_cmd = np.asarray(m_cmd, dtype=float)    # shape (N, 3)
     t_on = np.asarray(t_on, dtype=float)      # shape (N, 3)
     m_des = np.asarray(m_des, dtype=float)
+
+    r_eci = np.asarray(r_eci, dtype=float) if len(r_eci) else np.asarray([], dtype=float)
+    v_eci = np.asarray(v_eci, dtype=float) if len(v_eci) else np.asarray([], dtype=float)
+    r_norm = np.asarray(r_norm, dtype=float) if len(r_norm) else np.asarray([], dtype=float)
+    v_norm = np.asarray(v_norm, dtype=float) if len(v_norm) else np.asarray([], dtype=float)
+
+    if r_eci.size and (r_norm.size == 0 or r_norm.shape[0] != r_eci.shape[0]):
+        r_norm = np.linalg.norm(r_eci, axis=1)
+    if v_eci.size and (v_norm.size == 0 or v_norm.shape[0] != v_eci.shape[0]):
+        v_norm = np.linalg.norm(v_eci, axis=1)
 
     # 1) Angular-rate norm
     plt.figure()
@@ -209,17 +191,100 @@ def plot_results(res, t0):
         plt.grid(True)
         plt.legend()
 
-    # # 5) m_Des
-    # plt.figure()
-    # if m_des.size:
-    #     plt.plot(t_sec, m_des[:, 0], label="m_des_x")
-    #     plt.plot(t_sec, m_des[:, 1], label="m_des_y")
-    #     plt.plot(t_sec, m_des[:, 2], label="m_des_z")
-    #     plt.xlabel("Time [s]")
-    #     plt.ylabel("Commanded Dipole [A·m²]")
-    #     plt.title("Commanded Dipole vs Time")
-    #     plt.grid(True)
-    #     plt.legend()
+    # 5–7) Individual ω_B component plots
+    if w_B.size:
+        # Ensure correct shape
+        if w_B.ndim != 2 or w_B.shape[1] != 3:
+            raise ValueError(f"w_B expected shape (N,3), got {w_B.shape}")
+
+        # Time alignment
+        N = w_B.shape[0]
+        t_plot = t_sec[:N] if t_sec.size >= N else np.pad(t_sec, (0, N - t_sec.size), 'edge')
+
+        # X-axis
+        plt.figure()
+        plt.plot(t_plot, w_B[:, 0])
+        plt.xlabel("Time [s]")
+        plt.ylabel("ω_Bx [rad/s]")
+        plt.title("Body Rate ω_Bx vs Time")
+        plt.grid(True)
+
+        # Y-axis
+        plt.figure()
+        plt.plot(t_plot, w_B[:, 1])
+        plt.xlabel("Time [s]")
+        plt.ylabel("ω_By [rad/s]")
+        plt.title("Body Rate ω_By vs Time")
+        plt.grid(True)
+
+        # Z-axis
+        plt.figure()
+        plt.plot(t_plot, w_B[:, 2])
+        plt.xlabel("Time [s]")
+        plt.ylabel("ω_Bz [rad/s]")
+        plt.title("Body Rate ω_Bz vs Time")
+        plt.grid(True)
+    
+    if r_eci.size:
+        if r_eci.ndim != 2 or r_eci.shape[1] != 3:
+            raise ValueError(f"r_eci expected shape (N,3), got {r_eci.shape}")
+        Nr = r_eci.shape[0]
+        t_plot_r = t_sec[:Nr] if t_sec.size >= Nr else np.pad(t_sec, (0, Nr - t_sec.size), 'edge')
+
+        plt.figure()
+        plt.plot(t_plot_r, r_eci[:, 0], label="r_x (ECI)")
+        plt.plot(t_plot_r, r_eci[:, 1], label="r_y (ECI)")
+        plt.plot(t_plot_r, r_eci[:, 2], label="r_z (ECI)")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Position [m]")
+        plt.title("ECI Position Components vs Time")
+        plt.grid(True)
+        plt.legend()
+
+    # 9) ECI Velocity components v_x, v_y, v_z
+    if v_eci.size:
+        if v_eci.ndim != 2 or v_eci.shape[1] != 3:
+            raise ValueError(f"v_eci expected shape (N,3), got {v_eci.shape}")
+        Nv = v_eci.shape[0]
+        t_plot_v = t_sec[:Nv] if t_sec.size >= Nv else np.pad(t_sec, (0, Nv - t_sec.size), 'edge')
+
+        plt.figure()
+        plt.plot(t_plot_v, v_eci[:, 0], label="v_x (ECI)")
+        plt.plot(t_plot_v, v_eci[:, 1], label="v_y (ECI)")
+        plt.plot(t_plot_v, v_eci[:, 2], label="v_z (ECI)")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Velocity [m/s]")
+        plt.title("ECI Velocity Components vs Time")
+        plt.grid(True)
+        plt.legend()
+
+    # 10) Magnitudes |r| and |v|
+    if r_norm.size or v_norm.size:
+        # align times based on whichever exists
+        Nmag = max(r_norm.shape[0] if r_norm.size else 0, v_norm.shape[0] if v_norm.size else 0)
+        if Nmag:
+            t_plot_mag = t_sec[:Nmag] if t_sec.size >= Nmag else np.pad(t_sec, (0, Nmag - t_sec.size), 'edge')
+
+            plt.figure()
+            if r_norm.size:
+                plt.plot(t_plot_mag[:r_norm.shape[0]], r_norm, label="|r| (ECI)")
+            if v_norm.size:
+                plt.plot(t_plot_mag[:v_norm.shape[0]], v_norm, label="|v| (ECI)")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Magnitude")
+            plt.title("ECI Magnitudes |r| and |v| vs Time")
+            plt.grid(True)
+            plt.legend()
+
+            # Small annotation clarifying ECI axes (useful in reviews)
+            ax = plt.gca()
+            txt = (
+                "ECI frame: Earth-centered, non-rotating.\n"
+                "Z along Earth's spin axis; X to vernal equinox; Y completes right hand."
+            )
+            ax.text(0.02, 0.02, txt, transform=ax.transAxes, fontsize=9,
+                    verticalalignment="bottom", horizontalalignment="left",
+                    bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
 
     plt.show()
 
@@ -232,10 +297,10 @@ def run():#
     sim, x_orbit0 = build_sim()
 
     #sim_duration = 5 * 60
-    #sim_duration =  2 * 1.53 * 60 * 60.0
-    #sim_duration = 1 * 60 * 60 #seconds 
-    sim_duration = 20000
-    #sim_duration = 18.5 * 1.53 * 3600.0 # n orbits? i think
+    #sim_duration =  8 * 1.53 * 60 * 60.0
+    #sim_duration = 4 * 60 * 60 #seconds 
+    #sim_duration = 10000
+    sim_duration = 18.5 * 1.53 * 3600.0 # n orbits? i think
 
     
 
@@ -246,11 +311,6 @@ def run():#
     res = result if isinstance(result, dict) else getattr(sim, "log", {})
 
     plot_results(res, t0)
-
-    # print("n_samples:", len(res["t"]))
-    # print("t[0]:", res["t"][0], "  t[-1]:", res["t"][-1])
-    # print("unique_seconds_spanned:", (np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[-1] -
-    #                                 np.asarray(res["t"], dtype="datetime64[ns]").astype("int64")[0]) / 1e9)
 
     t_arr = np.asarray(res.get("t", []), dtype=float)
     if t_arr.size:

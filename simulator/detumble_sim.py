@@ -40,7 +40,11 @@ class DetumbleSim:
             "b_norm": [],
             "m_cmd": [],
             "t_on": [],
-            "dir": []
+            "dir": [],
+            "r_eci": [],   # meters, ECI
+            "v_eci": [],   # m/s, ECI
+            "r_norm": [],  # |r| [m]
+            "v_norm": [],  # |v| [m/s]
         }
     
 
@@ -68,9 +72,9 @@ class DetumbleSim:
         gmst0 = gmst_angle_rad(t0_utc)
         self.field._gmst = GMSTTracker(t0_utc, gmst0)
 
-        x_orbit = x_orbit0.copy() # check if i need this later
+        x_orbit = x_orbit0.copy()
 
-        print(f"End time = {duration}")
+        print(f"Sim Duration (s) = {duration}")
 
         
 
@@ -86,33 +90,15 @@ class DetumbleSim:
 
             #test
             t1 = perf_counter()
-
             b_eci_T = self.field.b_eci(x_orbit[:3], epoch_now)
-            #b_body_T = self._field_body_now(x_orbit, epoch_now)
-
-            #b_body_T = self.field.b_body(x_orbit[:3], self.att.q_IB, epoch_now)
-
-
             #test
             field_time += perf_counter() - t1
 
-            #next_field_update = t_sim + K_field * T_s
-
-
-
-
-
-
-
             b_body_T = rotate_eci(self.att.q_IB, b_eci_T) #???
             b_norm = float(np.linalg.norm(b_body_T))
-
-
             #TEST
             t_cmd = perf_counter()
 
-
-            
             out = self.ctrl.command(b_body_T)
             m_cmd = out[0]
             t_on = out[1]
@@ -124,31 +110,16 @@ class DetumbleSim:
 
             dir_vec = out[2]
 
-            #             # ENERGY-AWARE DIRECTION (guarantee negative power)
-            # Bxb = np.cross(b_body_T, self.att.w_B)   # B × ω (BODY)
-            # opt_dir = -np.sign(Bxb)                            # -sign(B × ω)
-            # # keep zeros as +1 to avoid "no direction"
-            # opt_dir[opt_dir == 0.0] = 1.0
-            # # apply coil polarity mapping if you use it
-            # dir_vec = (opt_dir.astype(int))                    # or: (self.ctrl.cfg.polarity * opt_dir).astype(int)
-
-
             #TEST
             cmd_time += perf_counter() - t_cmd
             ctrl_calls += 1
-
-            
-
-            
 
             if b_norm <= 0.0:
                 m_cmd = np.zeros(3)
                 t_on = np.zeros(3)
                 dir_vec = np.zeros(3, dtype=int)
 
-
-
-            if np.linalg.norm(self.att.w_B) <= self.cfg.w_stop_rad: #should I pass this through the config
+            if np.linalg.norm(self.att.w_B) <= self.cfg.w_stop_rad:
                 self._stop_counter += 1
             else:
                 self._stop_counter = 0
@@ -156,96 +127,64 @@ class DetumbleSim:
                 self._detumbled = True
                 break
 
-
+            # scrapped eq 26 and using the average instead
+            m_eff = dir_vec.astype(float) * self.ctrl.cfg.m_bar * (t_on / self.cfg.T_s)
 
             elapsed = 0.0
-            P_sum = 0.0
-            m_c = np.zeros(3)
             for i in range(Nsub):
-                m_c.fill(0.0) #commanded mag dipole
-                for j in range(3):
-                    if elapsed < float(t_on[j]) and dir_vec[j] != 0:
-                        m_c[j] = float(dir_vec[j]) * float(self.ctrl.cfg.m_bar[j])
-
-
-                #epoch_now_sub = t0_utc + timedelta(seconds=(t_sim + elapsed))
                 t1 = perf_counter()
-
-
-                #b_eci_sub_T = self.field.b_eci(x_orbit[:3], epoch_now_sub)
                 b_body_sub_T = rotate_eci(self.att.q_IB, b_eci_T)
                 field_time += perf_counter() - t1
-
-
-                tau_c_B = np.cross(m_c, b_body_sub_T) #control torque
-                #tau_c_B = np.cross(b_body_sub_T, m_c)
-
+                tau_c_B = np.cross(m_eff, b_body_sub_T)
                 #test
                 t2 = perf_counter()
-
-
-
-
                 self.att.step(h, tau_c_B) #STEP
-
                 #test
                 att_time += perf_counter() - t2
-
-
                 #test
                 t3 = perf_counter()
-
-
                 x_orbit = self.orbit_step(x_orbit, h)
-
-
-
                 #test
                 orb_time += perf_counter() - t3
                 substeps += 1
                 elapsed += h
             
-            
-            # if self.cfg.log_every_sample:
-            #     self._log_sample(t_sim, self.att.w_B, p, pv, b_norm, k_bdot, m_cmd, t_on, dir_vec)
-
             if self.cfg.log_every_sample:
-                self._log_sample(t_sim + T_s, self.att.w_B, b_norm, m_cmd, t_on, dir_vec)
+                r_eci = x_orbit[:3].copy()
+                v_eci = x_orbit[3:].copy()
+                self._log_sample(t_sim + T_s, self.att.w_B, b_norm, m_cmd, t_on, dir_vec, r_eci, v_eci)
             t_sim += T_s
 
-        
 
         if self._detumbled:
             t_det = t0_utc + timedelta(seconds=t_sim)
         else:
             t_det = None
 
-
-
-        print(float(t_on_sum[0] / amount_of_cycles))
-        print(float(t_on_sum[1] / amount_of_cycles))
-        print(float(t_on_sum[2] / amount_of_cycles))
-
         t_total = perf_counter() - t_wall0
-        print(f"[Perf] sim_sec={duration:.3f}  wall_sec={t_total:.3f}  "
+        print(f"[Perf] RATIO={duration/t_total:.3f}im_sec={duration:.3f}  wall_sec={t_total:.3f}  "
           f"field={field_time:.3f}s  cmd={cmd_time:.3f}s  att={att_time:.3f}s  "
           f"orb={orb_time:.3f}s  ctrl_ticks={ctrl_calls} substeps={substeps}")
 
 
 
         return {
-            #"t": np.asarray(self.log["t"], dtype="datetime64[ns]") if self.cfg.log_every_sample else np.array([], dtype="datetime64[ns]"),
             "t": np.asarray(self.log["t"], dtype=float) if self.cfg.log_every_sample else np.array([], dtype=float),
             "w_B": self._maybe_array("w_B", (0, 3)),
             "b_norm": self._maybe_array("b_norm", (0,)),
             "m_cmd": self._maybe_array("m_cmd", (0, 3)),
             "t_on": self._maybe_array("t_on", (0, 3)),
             "dir": self._maybe_array("dir", (0, 3)),
+
+            "r_eci": self._maybe_array("r_eci", (0, 3)),
+            "v_eci": self._maybe_array("v_eci", (0, 3)),
+            "r_norm": self._maybe_array("r_norm", (0,)),
+            "v_norm": self._maybe_array("v_norm", (0,)),
+
+
             "t_detumbled": np.datetime64(t_det) if t_det is not None else None,
             "detumbled": bool(self._detumbled),
         }
-
-
 
     def _empty(self, shape):
         return np.empty(shape)
@@ -255,9 +194,7 @@ class DetumbleSim:
             return np.asarray(self.log[key])
         return self._empty(shape)
             
-    
-
-    def _log_sample(self, t, w_B,b_norm,m_cmd,t_on,dir_vec):
+    def _log_sample(self, t, w_B,b_norm,m_cmd,t_on,dir_vec, r_eci, v_eci):
         """Collect per-sample metrics for analysis and validation."""
         self.log["t"].append(t)
         self.log["w_B"].append(np.asarray(w_B, dtype=float).copy())
@@ -266,10 +203,9 @@ class DetumbleSim:
         self.log["t_on"].append(np.asarray(t_on, dtype=float).copy())
         self.log["dir"].append(np.asarray(dir_vec, dtype=int).copy())
 
-
-
-    def _field_body_now(self, x_orbit, current_time):
-
-        r_eci_m = x_orbit[:3]
-
-        return self.field.b_body(r_eci_m, self.att.q_IB, current_time) #T``
+        r = np.asarray(r_eci, dtype=float).copy()
+        v = np.asarray(v_eci, dtype=float).copy()
+        self.log["r_eci"].append(r)
+        self.log["v_eci"].append(v)
+        self.log["r_norm"].append(float(np.linalg.norm(r)))
+        self.log["v_norm"].append(float(np.linalg.norm(v)))

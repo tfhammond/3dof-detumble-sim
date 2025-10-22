@@ -56,7 +56,6 @@ def utc_to_julian_date(dt_utc):
 
     # Add the fractional part for the time of day
     fractional_day = (hour + minute / 60 + second / 3600) / 24.0
-    #fractional_day = (hour + minute / 60 + second / 3600 + microsecond / 3600000000) / 24.0
     
     return julian + fractional_day
 
@@ -65,8 +64,6 @@ def gmst_angle_rad(date):
     julian = utc_to_julian_date(date)
     
     T = (julian - 2451545.0) / 36525
-
-    #theta = (280.46061837 + 360.98564736629 * (julian - 2451545.0) + 0.000387933 * T**2 - (T**3) / 38710000.0)
 
     theta_deg = (280.46061837
                  + 360.98564736629 * (julian - 2451545.0)
@@ -101,23 +98,15 @@ def ecef_to_eci(state, theta):
 def ecef_to_spherical(ecef): #returns r km,theta deg,phi deg
 
     x,y,z = ecef
-    #x_km, y_km, z_km = x/1000, y/1000, z/1000 #km
-    r = float(np.linalg.norm(ecef)) #/ 1000 #km
+    r = float(np.linalg.norm(ecef))
     if r == 0.0:
         return 0.0,0.0,0.0
-    
-
-    #0 at north pole and 90 at equator? (second quatrant)
 
     z_r = np.clip(z / r, -1.0, 1.0)
     theta_rad = np.arccos(z_r)
     phi_rad = np.arctan2(y, x)
 
     r_km = r / 1000.0
-
-    
-    # theta_rad = np.arccos(np.clip(z_km / r_km, -1.0, 1.0))  #colatitude 
-    # phi_rad = np.arctan2(y_km,x_km) # degrees east (same as lon)
 
     theta = np.degrees(theta_rad)
     phi = np.degrees(phi_rad)
@@ -129,18 +118,6 @@ def spherical_to_ecef(b_r, b_theta, b_phi, theta, phi): #theta and phi in deg
    #(X = r * cos(lat) * cos(lon), Y = r * cos(lat) * sin(lon), and Z = r * sin(lat) I think)
 
     # https://en.wikipedia.org/wiki/Spherical_coordinate_system#Integration_and_differentiation_in_spherical_coordinates
-
-
-    #theta_rad = np.radians(theta)
-    #phi_rad = np.radians(phi)
-
-
-    # #unit vectors
-    # e_r = np.array([np.sin(theta_rad) * np.cos(phi_rad), np.sin(theta_rad) * np.sin(phi_rad), np.cos(theta_rad)])
-
-    # e_theta = np.array([np.cos(theta_rad) * np.cos(phi_rad), np.cos(theta_rad) * np.sin(phi_rad), -np.sin(theta_rad)])
-                          
-    # e_phi = np.array([-np.sin(phi_rad), np.cos(phi_rad), 0.0])
 
     th = np.radians(theta)
     ph = np.radians(phi)
@@ -161,8 +138,6 @@ def rotate_eci(q_ib, v_eci):
     q = normalize_quat(q_ib)
 
     v_q = np.array([0.0, v_eci[0], v_eci[1], v_eci[2]])
-
-    #v_b = quat_multiply(quat_conjugate(q), quat_multiply(q,v_q))
 
     q_conjugate = quat_conjugate(q)
 
