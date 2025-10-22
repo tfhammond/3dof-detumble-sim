@@ -296,13 +296,7 @@ def run():#
 
     sim, x_orbit0 = build_sim()
 
-    #sim_duration = 5 * 60
-    #sim_duration =  8 * 1.53 * 60 * 60.0
-    #sim_duration = 4 * 60 * 60 #seconds 
-    #sim_duration = 10000
-    sim_duration = 18.5 * 1.53 * 3600.0 # n orbits? i think
-
-    
+    sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
 
     t_final = t0 + timedelta(seconds=sim_duration)
  
@@ -317,6 +311,7 @@ def run():#
         print("n_samples:", len(t_arr))
         print("t[0] [s]:", float(t_arr[0]), "  t[-1] [s]:", float(t_arr[-1]))
         print("simulated_span_seconds:", float(t_arr[-1] - t_arr[0]))
+
 
 
     
