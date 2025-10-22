@@ -64,7 +64,7 @@ def build_sim():
     h = 0.01
     duty = 0.6
     m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
-    polarity = np.array([-1, -1, -1], dtype=int)
+    polarity = np.array([1, 1, 1], dtype=int)
     I_min = float(np.min(np.diag(I)))
     omega_orbit = float(kep.n)
     xi_geomag = kep.i
@@ -296,7 +296,8 @@ def run():#
 
     sim, x_orbit0 = build_sim()
 
-    sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
+    #sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
+    sim_duration = 3000
 
     t_final = t0 + timedelta(seconds=sim_duration)
  

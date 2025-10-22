@@ -2,7 +2,7 @@ import numpy as np
 
 from controller.bdotcontroller import BDotController
 from attitude_dynamics.dynamics import Dynamics
-from magnetic_field.model import MagneticFieldModel, rotate_eci, GMSTTracker, gmst_angle_rad
+from magnetic_field.model import MagneticFieldModel, rotate_eci, GMSTTracker, gmst_angle_rad, eci_to_body
 
 from simulator.config import DetumbleConfig
 
@@ -94,7 +94,8 @@ class DetumbleSim:
             #test
             field_time += perf_counter() - t1
 
-            b_body_T = rotate_eci(self.att.q_IB, b_eci_T) #???
+            #b_body_T = rotate_eci(self.att.q_IB, b_eci_T) #???
+            b_body_T = eci_to_body(self.att.q_IB, b_eci_T)
             b_norm = float(np.linalg.norm(b_body_T))
             #TEST
             t_cmd = perf_counter()
@@ -133,7 +134,8 @@ class DetumbleSim:
             elapsed = 0.0
             for i in range(Nsub):
                 t1 = perf_counter()
-                b_body_sub_T = rotate_eci(self.att.q_IB, b_eci_T)
+                #b_body_sub_T = rotate_eci(self.att.q_IB, b_eci_T)
+                b_body_sub_T = eci_to_body(self.att.q_IB, b_eci_T)
                 field_time += perf_counter() - t1
                 tau_c_B = np.cross(m_eff, b_body_sub_T)
                 #test
