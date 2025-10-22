@@ -29,7 +29,6 @@ def kepler_solve_E(M, e):
 
 class KeplerToRV:
 
-    # TODO Write tests for rv_eci
     def rv_eci(self, el):
         i = el.i
         raan = el.raan

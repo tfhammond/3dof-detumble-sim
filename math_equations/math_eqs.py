@@ -36,5 +36,20 @@ def normalize_quat(q):
     n = np.linalg.norm(q)
     if n == 0:
         return np.array([1.0, 0.0, 0.0, 0.0]) # default to no rotatio
+        #return q
     return q / n
+
+def quat_rate_scalar_first(q, w):
+    """
+    Quaternion derivative q̇ = 0.5 * Ω(ω) q for scalar-first q = [q0, q1, q2, q3].
+    ω = [p, q, r] in body axes.
+    """
+    q0, q1, q2, q3 = q
+    p, q_, r = w
+    return 0.5 * np.array([
+        -(p*q1 + q_*q2 + r*q3),
+         p*q0 + r*q2 - q_*q3,
+         q_*q0 - r*q1 + p*q3,
+         r*q0 + q_*q1 - p*q2
+    ])
 

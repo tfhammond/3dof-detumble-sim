@@ -8,6 +8,30 @@ import ppigrf
 
 from math_equations.math_eqs import quat_conjugate, quat_multiply, normalize_quat
 
+
+# IERS conventional Earth rotation rate (rad/s)
+EARTH_OMEGA = 7.2921150e-5
+TWOPI = 2.0 * np.pi
+
+class GMSTTracker:
+    """
+    Keep GMST updated cheaply between known UTC-naive datetimes.
+    Assumes date inputs are naive UTC (tzinfo is None).
+    """
+    def __init__(self, t0_utc_naive, gmst0_rad):
+        self.t_ref = t0_utc_naive
+        self.theta_ref = gmst0_rad  # gmst_angle_rad(t0_utc_naive)
+
+    def theta(self, t_utc_naive):
+        # Fast: linear update from the reference time
+        dt = (t_utc_naive - self.t_ref).total_seconds()
+        return (self.theta_ref + EARTH_OMEGA * dt) % TWOPI
+
+    def reset(self, t_utc_naive, gmst_exact_rad):
+        # Occasionally recompute exact GMST to bound any drift
+        self.t_ref = t_utc_naive
+        self.theta_ref = gmst_exact_rad
+
 def utc_to_julian_date(dt_utc):
     """
     UTC datetime to a Julian Date.
@@ -32,7 +56,6 @@ def utc_to_julian_date(dt_utc):
 
     # Add the fractional part for the time of day
     fractional_day = (hour + minute / 60 + second / 3600) / 24.0
-    #fractional_day = (hour + minute / 60 + second / 3600 + microsecond / 3600000000) / 24.0
     
     return julian + fractional_day
 
@@ -41,8 +64,6 @@ def gmst_angle_rad(date):
     julian = utc_to_julian_date(date)
     
     T = (julian - 2451545.0) / 36525
-
-    #theta = (280.46061837 + 360.98564736629 * (julian - 2451545.0) + 0.000387933 * T**2 - (T**3) / 38710000.0)
 
     theta_deg = (280.46061837
                  + 360.98564736629 * (julian - 2451545.0)
@@ -56,31 +77,36 @@ def gmst_angle_rad(date):
 
 def about_z(theta):
     """rotation about z axis by theta. used in eci to ecef and ecef to eci"""
-
-    return np.array([[ np.cos(theta), -np.sin(theta), 0.0],
-                     [np.sin(theta), np.cos(theta), 0.0],
-                     [0.0           , 0.0          , 1.0]])
+    c = np.cos(theta)
+    s = np.sin(theta)
+    return np.array([[c,   -s, 0.0  ],
+                     [s,    c,  0.0 ],
+                     [0.0, 0.0, 1.0]])
 
 
 
 def eci_to_ecef(state, theta):
     """ positive z"""
-    return about_z(theta) @ state
+    R = about_z(theta)
+    return R @ state
 
 def ecef_to_eci(state, theta):
     """ negative z"""
-    return about_z(-theta) @ state
+    R = about_z(theta)
+    return R.T @ state
 
 def ecef_to_spherical(ecef): #returns r km,theta deg,phi deg
 
     x,y,z = ecef
-    x_km, y_km, z_km = x/1000, y/1000, z/1000 #km
-    r_km = float(np.linalg.norm(ecef)) / 1000 #km
-    
-    #0 at north pole and 90 at equator? (second quatrant)
-    
-    theta_rad = np.arccos(np.clip(z_km / r_km, -1.0, 1.0))  #colatitude 
-    phi_rad = np.arctan2(y_km,x_km) # degrees east (same as lon)
+    r = float(np.linalg.norm(ecef))
+    if r == 0.0:
+        return 0.0,0.0,0.0
+
+    z_r = np.clip(z / r, -1.0, 1.0)
+    theta_rad = np.arccos(z_r)
+    phi_rad = np.arctan2(y, x)
+
+    r_km = r / 1000.0
 
     theta = np.degrees(theta_rad)
     phi = np.degrees(phi_rad)
@@ -93,17 +119,15 @@ def spherical_to_ecef(b_r, b_theta, b_phi, theta, phi): #theta and phi in deg
 
     # https://en.wikipedia.org/wiki/Spherical_coordinate_system#Integration_and_differentiation_in_spherical_coordinates
 
+    th = np.radians(theta)
+    ph = np.radians(phi)
+    sth, cth = np.sin(th), np.cos(th)
+    sph, cph = np.sin(ph), np.cos(ph)
 
-    theta_rad = np.radians(theta)
-    phi_rad = np.radians(phi)
-
-
-    #unit vectors
-    e_r = np.array([np.sin(theta_rad) * np.cos(phi_rad), np.sin(theta_rad) * np.sin(phi_rad), np.cos(theta_rad)])
-
-    e_theta = np.array([np.cos(theta_rad) * np.cos(phi_rad), np.cos(theta_rad) * np.sin(phi_rad), -np.sin(theta_rad)])
-                          
-    e_phi = np.array([-np.sin(phi_rad), np.cos(phi_rad), 0.0])
+    # Unit vectors at (θ, φ)
+    e_r     = np.array([ sth*cph,  sth*sph,  cth ], dtype=float)
+    e_theta = np.array([ cth*cph,  cth*sph, -sth ], dtype=float)
+    e_phi   = np.array([-sph,      cph,      0.0 ], dtype=float)
 
     b_ecef = b_r * e_r + b_theta * e_theta + b_phi * e_phi
 
@@ -115,7 +139,9 @@ def rotate_eci(q_ib, v_eci):
 
     v_q = np.array([0.0, v_eci[0], v_eci[1], v_eci[2]])
 
-    v_b = quat_multiply(quat_conjugate(q), quat_multiply(q,v_q))
+    q_conjugate = quat_conjugate(q)
+
+    v_b = quat_multiply(quat_multiply(q, v_q), q_conjugate)
 
     return v_b[1:]
 
@@ -129,6 +155,9 @@ class MagneticFieldModel:
         r_eci in meters
     """
 
+    def __init__(self, gmsttracker):
+        self._gmst = gmsttracker
+
     def b_eci(self, r_eci, date):
         """
         1. ECI -> ECEF using GMST(when).
@@ -138,7 +167,11 @@ class MagneticFieldModel:
         5. ECEF -> ECI return b_eci.
         """
         
-        theta = gmst_angle_rad(date)
+        assert date.tzinfo is None, "b_eci expects a native UTC datetime"
+
+
+        #theta = gmst_angle_rad(date)
+        theta = self._gmst.theta(date)
 
 
         r_ecef = eci_to_ecef(r_eci, theta)
@@ -147,9 +180,10 @@ class MagneticFieldModel:
         if r <= 0.0:
             return np.zeros(3)
         
-        date_naive = date.astimezone(timezone.utc).replace(tzinfo=None)
+        #make sure I call this 
+        #date_naive = date.astimezone(timezone.utc).replace(tzinfo=None) 
         
-        b_r, b_theta, b_phi = ppigrf.igrf_gc(r,theta_deg,phi_deg, date_naive)
+        b_r, b_theta, b_phi = ppigrf.igrf_gc(r,theta_deg,phi_deg, date)
 
         b_r *= 1e-9
         b_theta *= 1e-9
