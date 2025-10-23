@@ -146,7 +146,7 @@ def rotate_eci(q_ib, v_eci):
     return v_b[1:]
 
 def eci_to_body(q_IB, v_eci):
-    # q_IB is Body→Inertial stored in the state; invert to get Inertial→Body
+    # q_IB is Body→Inertial stored in the state. Invert to get Inertial→Body
     return rotate_eci(quat_conjugate(q_IB), v_eci)
 
     
