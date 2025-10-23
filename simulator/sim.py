@@ -43,8 +43,7 @@ def build_sim():
     r0, v0 = KeplerToRV().rv_eci(kep)
     x_orbit0 = np.hstack((r0, v0))
 
-    I = np.diag([0.001731, 0.001726, 0.000264]) # kg*m^2
-    #I =  np.diag([0.001, 0.001, 0.001]) # kg·m^2 (example)
+    I =  np.diag([0.001, 0.001, 0.001]) # kg·m^2 (example)
     q_IB0 = np.array([1.0, 0.0, 0.0, 0.0]) # scalar-first quaternion
     w_B0 = np.deg2rad(np.array([180.0, 180.0, 180.0]))  # rad/s (fast tumbling start) from paper
     dyn = Dynamics(I=I, q_IB=q_IB0, w_B=w_B0)
@@ -64,7 +63,7 @@ def build_sim():
     h = 0.01
     duty = 0.6
     m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
-    polarity = np.array([-1, -1, -1], dtype=int)
+    polarity = np.array([1, 1, 1], dtype=int)
     I_min = float(np.min(np.diag(I)))
     omega_orbit = float(kep.n)
     xi_geomag = kep.i
@@ -296,7 +295,8 @@ def run():#
 
     sim, x_orbit0 = build_sim()
 
-    sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
+    #sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
+    sim_duration = 3000
 
     t_final = t0 + timedelta(seconds=sim_duration)
  
