@@ -204,17 +204,6 @@ print("Detumble time:", result["t_detumbled"])
 
 ---
 
-## Validation Notes
-
-Practical correctness checks built into the implementation:
-
-* Quaternion normalization applied after each integration step to maintain **unit norm**
-* Torque computed using **τ = m × B**, ensuring torque is orthogonal to the magnetic field direction
-* Stop rule enforces *sustained* low-rate behavior rather than a single threshold crossing
-* Logging of orbit state (**r, v**) enables sanity checking of propagation (e.g., |r|, |v| stability over short runs)
-
----
-
 ## References
 
 * Example reference paper (controller formulation and detumble approach):
