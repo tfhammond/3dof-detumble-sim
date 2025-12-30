@@ -34,6 +34,9 @@ class DetumbleSim:
         self._stop_counter = 0
         self._detumbled = False
 
+        # decimate logging to lighten allocations (1 = log every sample)
+        self._log_stride = max(1, int(getattr(cfg, "log_stride", 1)))
+
         self.log = {
             "t": [],
             "w_B": [],
@@ -83,6 +86,7 @@ class DetumbleSim:
         t_sim = 0.0
         t_on_sum = [0.0,0.0,0.0]
         amount_of_cycles = 0
+        sample_idx = 0
 
         while t_sim <= duration + 1e-12 and not self._detumbled:
             
@@ -143,19 +147,20 @@ class DetumbleSim:
                 self.att.step(h, tau_c_B) #STEP
                 #test
                 att_time += perf_counter() - t2
-                #test
-                t3 = perf_counter()
-                x_orbit = self.orbit_step(x_orbit, h)
-                #test
-                orb_time += perf_counter() - t3
                 substeps += 1
                 elapsed += h
+
+            # advance the orbit once per control sample (not every attitude substep)
+            t3 = perf_counter()
+            x_orbit = self.orbit_step(x_orbit, T_s)
+            orb_time += perf_counter() - t3
             
-            if self.cfg.log_every_sample:
+            if self.cfg.log_every_sample and (sample_idx % self._log_stride == 0):
                 r_eci = x_orbit[:3].copy()
                 v_eci = x_orbit[3:].copy()
                 self._log_sample(t_sim + T_s, self.att.w_B, b_norm, m_cmd, t_on, dir_vec, r_eci, v_eci)
             t_sim += T_s
+            sample_idx += 1
 
 
         if self._detumbled:

@@ -12,5 +12,6 @@ class DetumbleConfig:
     omega_max : float #worst case |w| rad/s
 
     log_every_sample : bool #log each control sample or not
+    log_stride : int = 10  # log every Nth control sample (1 = log all)
 
     w_stop_rad : float = np.deg2rad(2.0)

@@ -44,6 +44,7 @@ def build_sim():
     x_orbit0 = np.hstack((r0, v0))
 
     I =  np.diag([0.001, 0.001, 0.001]) # kg·m^2 (example)
+    #I = np.diag([0.001731, 0.001726, 0.000264]) # kg*m^2
     q_IB0 = np.array([1.0, 0.0, 0.0, 0.0]) # scalar-first quaternion
     w_B0 = np.deg2rad(np.array([180.0, 180.0, 180.0]))  # rad/s (fast tumbling start) from paper
     dyn = Dynamics(I=I, q_IB=q_IB0, w_B=w_B0)
@@ -59,8 +60,8 @@ def build_sim():
 
     #controller
 
-    T_s = 0.1 # s
-    h = 0.01
+    T_s = 0.25 # s
+    h = 0.025
     duty = 0.6
     m_bar = np.array([0.002, 0.002, 0.002]) # A*m^2
     polarity = np.array([1, 1, 1], dtype=int)
@@ -295,8 +296,9 @@ def run():#
 
     sim, x_orbit0 = build_sim()
 
-    #sim_duration = 18.5 * 1.53 * 3600.0 # n orbits?
-    sim_duration = 3000
+    # n orbits
+    orbits = 18.5 
+    sim_duration = orbits * 1.53 * 3600.0
 
     t_final = t0 + timedelta(seconds=sim_duration)
  
