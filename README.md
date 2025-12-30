@@ -4,6 +4,8 @@ A physics-based **3-degree-of-freedom CubeSat detumbling simulation** using **ma
 
 This project models the post-deployment detumble phase of a CubeSat, where high initial body rates are damped using Earth’s magnetic field as the only control authority.
 
+![alt text](https://github.com/tfhammond/3dof-detumble-sim/tree/main/examples/w_B.png "Angular Velocity")
+
 ---
 
 ## Overview
